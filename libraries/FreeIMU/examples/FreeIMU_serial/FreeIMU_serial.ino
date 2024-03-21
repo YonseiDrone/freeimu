@@ -37,7 +37,7 @@ void setup() {
   my3IMU.init(true);
   
   // LED
-  pinMode(13, OUTPUT);
+  // pinMode(13, OUTPUT);
 }
 
 
@@ -93,9 +93,9 @@ void loop() {
       }
       my3IMU.calLoad(); // reload calibration
       // toggle LED after calibration store.
-      digitalWrite(13, HIGH);
-      delay(1000);
-      digitalWrite(13, LOW);
+      // digitalWrite(13, HIGH);
+      // delay(1000);
+      // digitalWrite(13, LOW);
     }
     else if(cmd == 'x') {
       EEPROM.write(FREEIMU_EEPROM_BASE, 0); // reset signature
