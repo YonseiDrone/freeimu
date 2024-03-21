@@ -27,7 +27,7 @@ from numpy import linalg
 
 
 def calibrate(x, y, z):
-  H = numpy.array([x, y, z, -y**2, -z**2, numpy.ones([len(x), 1])])
+  H = numpy.array([x, y, z, -y**2, -z**2, numpy.ones([len(x)])])
   H = numpy.transpose(H)
   w = x**2
   
@@ -46,11 +46,11 @@ def calibrate(x, y, z):
   SCz = numpy.sqrt(C)
   
   # type conversion from numpy.float64 to standard python floats
-  offsets = [OSx, OSy, OSz]
-  scale = [SCx, SCy, SCz]
+  offsets = [float(OSx), float(OSy), float(OSz)]
+  scale = [float(SCx), float(SCy), float(SCz)]
   
-  offsets = map(numpy.asscalar, offsets)
-  scale = map(numpy.asscalar, scale)
+  # offsets = map(numpy.ndarray.item, offsets)
+  # scale = map(numpy.ndarray.item, scale)
   
   return (offsets, scale)
 
@@ -81,16 +81,16 @@ def compute_calibrate_data(data, offsets, scale):
 
 if __name__ == "__main__":
   
-  print "Calibrating from acc.txt"
+  print("Calibrating from acc.txt")
   (offsets, scale) = calibrate_from_file("acc.txt")
-  print "Offsets:"
-  print offsets
-  print "Scales:"
-  print scale
+  print("Offsets:")
+  print(offsets)
+  print("Scales:")
+  print(scale)
   
-  print "Calibrating from magn.txt"
+  print("Calibrating from magn.txt")
   (offsets, scale) = calibrate_from_file("magn.txt")
-  print "Offsets:"
-  print offsets
-  print "Scales:"
-  print scale
+  print("Offsets:")
+  print(offsets)
+  print("Scales:")
+  print(scale)

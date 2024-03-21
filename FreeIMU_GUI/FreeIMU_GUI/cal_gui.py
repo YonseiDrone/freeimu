@@ -22,9 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sys, os
-from PyQt4.QtGui import QApplication, QDialog, QMainWindow, QCursor, QFileDialog
+from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog
+from PyQt5.QtGui import QCursor
 from ui_freeimu_cal import Ui_FreeIMUCal
-from PyQt4.QtCore import Qt,QObject, pyqtSlot, QThread, QSettings, SIGNAL
+from PyQt5.QtCore import Qt,QObject, pyqtSlot, QThread, QSettings, pyqtSignal # SIGNAL
 import numpy as np
 import serial, time
 from struct import unpack, pack
@@ -50,10 +51,11 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
     # load user settings
     self.settings = QSettings("FreeIMU Calibration Application", "Fabio Varesano")
     # restore previous serial port used
-    self.serialPortEdit.setText(self.settings.value("calgui/serialPortEdit", "").toString())
+    self.serialPortEdit.setText(self.settings.value("calgui/serialPortEdit", ""))
     
     # when user hits enter, we generate the clicked signal to the button so that connection starts
-    self.connect(self.serialPortEdit, SIGNAL("returnPressed()"), self.connectButton, SIGNAL("clicked()"))
+    # self.connect(self.serialPortEdit, SIGNAL("returnPressed()"), self.connectButton, SIGNAL("clicked()"))
+    self.serialPortEdit.returnPressed.connect(self.connectButton.click)
     
     # Connect up the buttons to their functions
     self.connectButton.clicked.connect(self.serial_connect)
@@ -163,14 +165,14 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
       )
       
       if self.ser.isOpen():
-        print "Arduino serial port opened correctly"
+        print("Arduino serial port opened correctly")
         self.set_status("Connection Successfull. Waiting for Arduino reset...")
 
         # wait for arduino reset on serial open
         time.sleep(3)
         
-        self.ser.write('v') # ask version
-        self.set_status("Connected to: " + self.ser.readline()) # TODO: hangs if a wrong serial protocol has been loaded. To be fixed.
+        self.ser.write(b'v') # ask version
+        self.set_status("Connected to: " + self.ser.readline().decode()) # TODO: hangs if a wrong serial protocol has been loaded. To be fixed.
         
         self.connectButton.setText("Disconnect")
         self.connectButton.clicked.connect(self.serial_disconnect)
@@ -182,7 +184,7 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
         self.clearCalibrationEEPROMButton.setEnabled(True)
         self.clearCalibrationEEPROMButton.clicked.connect(self.clear_calibration_eeprom)
         
-    except serial.serialutil.SerialException, e:
+    except serial.serialutil.SerialException as e:
       self.connectButton.setEnabled(True)
       self.set_status("Impossible to connect: " + str(e))
       
@@ -192,7 +194,7 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
 
     
   def serial_disconnect(self):
-    print "Disconnecting from " + self.serial_port
+    print("Disconnecting from " + self.serial_port)
     self.ser.close()
     self.set_status("Disconnected")
     self.serialPortEdit.setEnabled(True)
@@ -209,9 +211,10 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
       
   def sampling_start(self):
     self.serWorker = SerialWorker(ser = self.ser)
-    self.connect(self.serWorker, SIGNAL("new_data(PyQt_PyObject)"), self.newData)
+    # self.connect(self.serWorker, SIGNAL("new_data(PyQt_PyObject)"), self.newData)
+    self.serWorker.new_data.connect(self.newData)
     self.serWorker.start()
-    print "Starting SerialWorker"
+    print("Starting SerialWorker")
     self.samplingToggleButton.setText("Stop Sampling")
     
     self.samplingToggleButton.clicked.disconnect(self.sampling_start)
@@ -236,8 +239,8 @@ class FreeIMUCal(QMainWindow, Ui_FreeIMUCal):
     (self.magn_offset, self.magn_scale) = cal_lib.calibrate_from_file(magn_file_name)
     
     # map floats into integers
-    self.acc_offset = map(int, self.acc_offset)
-    self.magn_offset = map(int, self.magn_offset)
+    self.acc_offset = list(map(int, self.acc_offset))
+    self.magn_offset = list(map(int, self.magn_offset))
     
     # show calibrated tab
     self.tabWidget.setCurrentIndex(1)
@@ -325,7 +328,7 @@ const float magn_scale_z = %f;
     self.set_status("Calibration saved to: " + str(calibration_h_folder) + calibration_h_file_name + " .\nRecompile and upload the program using the FreeIMU library to your microcontroller.")
   
   def save_calibration_eeprom(self):
-    self.ser.write("c")
+    self.ser.write(b"c")
     # pack data into a string 
     offsets = pack('<hhhhhh', self.acc_offset[0], self.acc_offset[1], self.acc_offset[2], self.magn_offset[0], self.magn_offset[1], self.magn_offset[2])
     scales = pack('<ffffff', self.acc_scale[0], self.acc_scale[1], self.acc_scale[2], self.magn_scale[0], self.magn_scale[1], self.magn_scale[2])
@@ -334,14 +337,14 @@ const float magn_scale_z = %f;
     self.ser.write(scales)
     self.set_status("Calibration saved to microcontroller EEPROM.")
     # debug written values to console
-    print "Calibration values read back from EEPROM:"
-    self.ser.write("C")
+    print("Calibration values read back from EEPROM:")
+    self.ser.write(b"C")
     for i in range(4):
-      print self.ser.readline()
+      print(self.ser.readline().decode())
       
       
   def clear_calibration_eeprom(self):
-    self.ser.write("x")
+    self.ser.write(b"x")
     # no feedback expected. we assume success.
     self.set_status("Calibration cleared from microcontroller EEPROM.")
     
@@ -374,6 +377,8 @@ const float magn_scale_z = %f;
 
 
 class SerialWorker(QThread):
+  new_data = pyqtSignal(object)
+  
   def __init__(self, parent = None, ser = None):
     QThread.__init__(self, parent)
     self.exiting = False
@@ -382,15 +387,15 @@ class SerialWorker(QThread):
     
     
   def run(self):
-    print "sampling start.."
+    print("sampling start..")
     self.acc_file = open(acc_file_name, 'w')
     self.magn_file = open(magn_file_name, 'w')
     count = 100
     in_values = 9
     reading = [0.0 for i in range(in_values)]
     while not self.exiting:
-      self.ser.write('b')
-      self.ser.write(chr(count))
+      self.ser.write(b'b')
+      self.ser.write(chr(count).encode())
       for j in range(count):
         for i in range(in_values):
           reading[i] = unpack('h', self.ser.read(2))[0]
@@ -401,8 +406,9 @@ class SerialWorker(QThread):
         magn_readings_line = "%d %d %d\r\n" % (reading[6], reading[7], reading[8])
         self.magn_file.write(magn_readings_line)
       # every count times we pass some data to the GUI
-      self.emit(SIGNAL("new_data(PyQt_PyObject)"), reading)
-      print ".",
+      # self.emit(SIGNAL("new_data(PyQt_PyObject)"), reading)
+      self.new_data.emit(reading)
+      print(".")
     # closing acc and magn files
     self.acc_file.close()
     self.magn_file.close()
@@ -411,7 +417,7 @@ class SerialWorker(QThread):
   def __del__(self):
     self.exiting = True
     self.wait()
-    print "SerialWorker exits.."
+    print("SerialWorker exits..")
 
 
 app = QApplication(sys.argv)
