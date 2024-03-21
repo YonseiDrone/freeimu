@@ -56,7 +56,7 @@ void myDelay(int time) {
 void setup() 
 {
   //size(VIEW_SIZE_X, VIEW_SIZE_Y, OPENGL);
-  size(800, 600, P3D);
+  size(800, 600, OPENGL);
   myPort = new Serial(this, serialPort, 115200);
   
   // The font must be located in the sketch's "data" directory to load successfully
